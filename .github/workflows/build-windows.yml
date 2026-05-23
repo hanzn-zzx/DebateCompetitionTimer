@@ -54,73 +54,9 @@ jobs:
           New-Item -Path "$portableDir\portable.txt" -ItemType File
           Compress-Archive -Path "$portableDir\*" -DestinationPath "${{ env.APP_NAME }}-portable.zip"
 
-      - name: Install MSIX packaging tools
-        shell: pwsh
-        run: |
-          # 使用 Chocolatey 安装 Windows SDK 中必要的打包组件
-          choco install windows-sdk-10.1 -y --params="/Features OptionId.DesktopAppxPackaging"
-          
-          $kitRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
-          $latest = Get-ChildItem $kitRoot -Directory |
-                    Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
-                    Sort-Object { [version]$_.Name } -Descending |
-                    Select-Object -First 1
-          $makeappxDir = Join-Path $latest.FullName "x64"
-          Add-Content -Path $env:GITHUB_PATH -Value $makeappxDir
-          Write-Host "##[info] makeappx.exe directory added to PATH: $makeappxDir"
-
-      - name: Create MSIX package
-        shell: pwsh
-        run: |
-          $nsisFolder = "src-tauri/target/${{ matrix.target }}/release/bundle/nsis"
-          $setupExe = Get-ChildItem -Path $nsisFolder -Filter "*_x64-setup.exe" | Select-Object -First 1
-          if (-not $setupExe) {
-            Write-Error "找不到 NSIS 安装程序于 $nsisFolder"
-            exit 1
-          }
-
-          $msixDir = "msix_temp"
-          $appName = "${{ env.APP_NAME }}"
-
-          # 静默解压到临时目录
-          Start-Process -FilePath $setupExe.FullName -ArgumentList "/S /D=$pwd\$msixDir" -Wait
-
-          # 生成 AppxManifest.xml（请确保已在仓库 Secrets 中添加了所需变量）
-          @"
-          <?xml version="1.0" encoding="utf-8"?>
-          <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
-                   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-                   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities">
-            <Identity Name="${{ env.MSIX_PUBLISHER_ID }}" Publisher="${{ env.MSIX_PUBLISHER }}" Version="1.0.0.0" />
-            <Properties>
-              <DisplayName>$appName</DisplayName>
-              <PublisherDisplayName>${{ env.MSIX_PUBLISHER_DISPLAY_NAME }}</PublisherDisplayName>
-              <Logo>Assets\StoreLogo.png</Logo>
-            </Properties>
-            <Dependencies>
-              <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.0.0" MaxVersionTested="10.0.0.0" />
-            </Dependencies>
-            <Resources>
-              <Resource Language="en-us" />
-            </Resources>
-            <Applications>
-              <Application Id="App" Executable="$appName.exe" EntryPoint="Windows.FullTrustApplication">
-                <uap:VisualElements DisplayName="$appName" Description="$appName" BackgroundColor="transparent"
-                                    Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
-                  <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
-                  <uap:SplashScreen Image="Assets\SplashScreen.png" />
-                </uap:VisualElements>
-              </Application>
-            </Applications>
-          </Package>
-          "@ | Out-File -FilePath "$msixDir\AppxManifest.xml" -Encoding utf8
-
-          makeappx pack /d $msixDir /p "$appName.msix"
-
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-windows-artifacts
           path: |
             ${{ env.APP_NAME }}-portable.zip
-            ${{ env.APP_NAME }}.msix
