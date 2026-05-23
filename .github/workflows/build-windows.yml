@@ -14,7 +14,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
           cache: 'npm'
 
       - name: Setup Rust
@@ -30,10 +30,12 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        run: npm run tauri build
+        run: npm run tauri build -- --target x86_64-pc-windows-msvc
 
-      - name: Upload artifacts
+      - name: Upload portable executable
         uses: actions/upload-artifact@v4
         with:
-          name: dct
-          path: src-tauri/target/release/bundle/**
+          name: dct-portable
+          path: |
+            src-tauri/target/release/dct.exe
+            src-tauri/target/release/resources/**

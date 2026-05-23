@@ -19,10 +19,10 @@ struct TimerRecordsData {
 }
 
 fn get_data_dir() -> std::path::PathBuf {
-    let dirs = directories::ProjectDirs::from("io", "hanzn", "dct").unwrap();
-    let data_dir = dirs.data_dir();
-    std::fs::create_dir_all(data_dir).unwrap();
-    data_dir.to_path_buf()
+    let exe_path = std::env::current_exe().unwrap();
+    let data_dir = exe_path.parent().unwrap().join("data");
+    std::fs::create_dir_all(&data_dir).unwrap();
+    data_dir
 }
 
 fn get_templates_path() -> std::path::PathBuf {
