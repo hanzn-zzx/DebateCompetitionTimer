@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { emit } from '@tauri-apps/api/event';
 
 const templates = ref([]);
@@ -188,7 +188,11 @@ async function startTimer() {
   };
 
   try {
-    const timerWindow = await getCurrentWindow('timer');
+    const timerWindow = await WebviewWindow.getByLabel('timer');
+    if (!timerWindow) {
+      alert('计时器窗口不存在');
+      return;
+    }
     await timerWindow.setSize({ width: window.screen.width, height: window.screen.height });
     await timerWindow.center();
     await timerWindow.setFullscreen(true);
