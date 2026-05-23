@@ -40,9 +40,18 @@ jobs:
       - name: Create portable package
         shell: pwsh
         run: |
-          $setupExe = "src-tauri/target/${{ matrix.target }}/release/bundle/nsis/${{ env.APP_NAME }}_*_x64-setup.exe"
+          $nsisFolder = "src-tauri/target/${{ matrix.target }}/release/bundle/nsis"
+          $setupExe = Get-ChildItem -Path $nsisFolder -Filter "*_x64-setup.exe" | Select-Object -First 1
+    
+          if (-not $setupExe) {
+              Write-Error "找不到 NSIS 安装程序于 $nsisFolder"
+              exit 1
+          }
+          Write-Host "找到安装程序: $($setupExe.FullName)"
+    
           $portableDir = "portable"
-          Start-Process -FilePath $setupExe -ArgumentList "/S /D=$pwd\$portableDir" -Wait
+    
+          Start-Process -FilePath $setupExe.FullName -ArgumentList "/S /D=$pwd\$portableDir" -Wait
           New-Item -Path "$portableDir\portable.txt" -ItemType File
           Compress-Archive -Path "$portableDir\*" -DestinationPath "${{ env.APP_NAME }}-portable.zip"
 
@@ -52,6 +61,14 @@ jobs:
       - name: Create MSIX package
         shell: pwsh
         run: |
+          
+          $nsisFolder = "src-tauri/target/${{ matrix.target }}/release/bundle/nsis"
+          $setupExe = Get-ChildItem -Path $nsisFolder -Filter "*_x64-setup.exe" | Select-Object -First 1
+          if (-not $setupExe) {
+            Write-Error "找不到 NSIS 安装程序于 $nsisFolder"
+            exit 1
+          }
+          
           $msixDir = "msix_temp"
           $appName = "${{ env.APP_NAME }}"
           Start-Process -FilePath $setupExe -ArgumentList "/S /D=$pwd\$msixDir" -Wait
