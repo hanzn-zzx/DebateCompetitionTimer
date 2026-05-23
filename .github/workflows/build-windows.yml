@@ -1,4 +1,4 @@
-name: Build Windows Portable & MSIX
+name: Build Windows Portable
 
 on:
   push:
