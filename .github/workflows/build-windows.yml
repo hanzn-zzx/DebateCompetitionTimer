@@ -47,7 +47,7 @@ jobs:
           Compress-Archive -Path "$portableDir\*" -DestinationPath "${{ env.APP_NAME }}-portable.zip"
 
       - name: Setup MSIX Packaging Tools
-        uses: microsoft/setup-winappcli@v1
+        uses: microsoft/setup-winappcli@v0.1
           
       - name: Create MSIX package
         shell: pwsh
