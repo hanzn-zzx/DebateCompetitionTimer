@@ -11,20 +11,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-          target: x86_64-pc-windows-msvc
-
-      - name: Setup Node
-        uses: actions/setup-node@v6.4.0
-        with:
-          node-version: 24
-          architecture: x64
-          
-      - name: Install tauri
-        run: npm install
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -32,12 +26,11 @@ jobs:
           workspaces: |
             './src-tauri -> target'
 
-      - name: Build Tauri app with cargo tauri build
-        run: cargo tauri build
-        working-directory: .
-        env:
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Tauri app
+        run: npm run tauri build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
