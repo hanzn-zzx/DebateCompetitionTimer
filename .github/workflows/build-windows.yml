@@ -1,9 +1,10 @@
-name: Build-Windows
+name: Build Windows Portable & MSIX
+
 on:
   push:
     tags:
-      - 'v*'       # 推送如 v1.0.0 的标签时自动触发
-  workflow_dispatch:  # 允许手动触发
+      - 'v*'               # 推送如 v1.0.0 的标签时自动触发
+  workflow_dispatch:        # 允许手动触发
 
 jobs:
   build-windows:
@@ -12,7 +13,7 @@ jobs:
       matrix:
         target: [x86_64-pc-windows-msvc]
     env:
-      APP_NAME: debate-competition-timer  # 请替换为你实际的应用名称
+      APP_NAME: dct   
 
     steps:
       - name: Checkout code
@@ -42,37 +43,49 @@ jobs:
         run: |
           $nsisFolder = "src-tauri/target/${{ matrix.target }}/release/bundle/nsis"
           $setupExe = Get-ChildItem -Path $nsisFolder -Filter "*_x64-setup.exe" | Select-Object -First 1
-    
           if (-not $setupExe) {
-              Write-Error "找不到 NSIS 安装程序于 $nsisFolder"
-              exit 1
+            Write-Error "找不到 NSIS 安装程序于 $nsisFolder"
+            exit 1
           }
           Write-Host "找到安装程序: $($setupExe.FullName)"
-    
+
           $portableDir = "portable"
-    
           Start-Process -FilePath $setupExe.FullName -ArgumentList "/S /D=$pwd\$portableDir" -Wait
           New-Item -Path "$portableDir\portable.txt" -ItemType File
           Compress-Archive -Path "$portableDir\*" -DestinationPath "${{ env.APP_NAME }}-portable.zip"
 
-      - name: Setup MSIX Packaging Tools
-        uses: microsoft/setup-winappcli@v0.1
+      - name: Install MSIX packaging tools
+        shell: pwsh
+        run: |
+          # 使用 Chocolatey 安装 Windows SDK 中必要的打包组件
+          choco install windows-sdk-10.1 -y --params="/Features OptionId.DesktopAppxPackaging"
           
+          $kitRoot = "C:\Program Files (x86)\Windows Kits\10\bin"
+          $latest = Get-ChildItem $kitRoot -Directory |
+                    Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } |
+                    Sort-Object { [version]$_.Name } -Descending |
+                    Select-Object -First 1
+          $makeappxDir = Join-Path $latest.FullName "x64"
+          Add-Content -Path $env:GITHUB_PATH -Value $makeappxDir
+          Write-Host "##[info] makeappx.exe directory added to PATH: $makeappxDir"
+
       - name: Create MSIX package
         shell: pwsh
         run: |
-          
           $nsisFolder = "src-tauri/target/${{ matrix.target }}/release/bundle/nsis"
           $setupExe = Get-ChildItem -Path $nsisFolder -Filter "*_x64-setup.exe" | Select-Object -First 1
           if (-not $setupExe) {
             Write-Error "找不到 NSIS 安装程序于 $nsisFolder"
             exit 1
           }
-          
+
           $msixDir = "msix_temp"
           $appName = "${{ env.APP_NAME }}"
-          Start-Process -FilePath $setupExe -ArgumentList "/S /D=$pwd\$msixDir" -Wait
-          
+
+          # 静默解压到临时目录
+          Start-Process -FilePath $setupExe.FullName -ArgumentList "/S /D=$pwd\$msixDir" -Wait
+
+          # 生成 AppxManifest.xml（请确保已在仓库 Secrets 中添加了所需变量）
           @"
           <?xml version="1.0" encoding="utf-8"?>
           <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
@@ -101,8 +114,8 @@ jobs:
             </Applications>
           </Package>
           "@ | Out-File -FilePath "$msixDir\AppxManifest.xml" -Encoding utf8
-          
-          makeappx pack /d $msixDir /p "${{ env.APP_NAME }}.msix"
+
+          makeappx pack /d $msixDir /p "$appName.msix"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
